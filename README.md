@@ -6,13 +6,13 @@
 
 | 平台 | 模型 | 状态 |
 |------|------|------|
-| DeepSeek | deepseek-chat, deepseek-reasoner, deepseek-r1 | ✅ |
-| Kimi (月之暗面) | kimi, kimi-vision | ✅ |
-| Metaso (秘塔AI搜索) | metaso, metaso-concise, metaso-detail, metaso-research | ✅ |
-| 豆包 (字节跳动) | doubao, doubao-pro, doubao-lite, doubao-1.5-pro | ✅ |
-| 千问 (通义千问) | qwen, qwen3, qwen3-max, qwen3-flash, qwen-long | ✅ |
-| 智谱清言 (ChatGLM) | zhipu, chatglm, glm-5 | ✅ |
-| MiniMax (海螺AI) | minimax, minimax-auto, MiniMax-M2.5 | ✅ |
+| DeepSeek | deepseek-chat, deepseek-reasoner, deepseek-v4-flash, deepseek-v4-pro, deepseek-r1 | ✅ |
+| Kimi (月之暗面) | kimi, kimi-k2.6, kimi-k2.6-code, kimi-k2.5, kimi-k2, kimi-k1.5 | ✅ |
+| Metaso (秘塔AI搜索) | metaso, metaso-fast, metaso-concise, metaso-detail, metaso-research | ✅ |
+| 豆包 (字节跳动) | doubao, doubao-pro, doubao-lite, doubao-pro-v1, doubao-lite-4k/32k, doubao-seedream-3 | ✅ |
+| 千问 (通义千问) | qwen, qwen3, qwen3.5-plus, qwen3.6-plus, qwen3-max, qwen3-flash, qwen3-coder, qwen-long | ✅ |
+| 智谱清言 (ChatGLM) | zhipu, chatglm, glm-4-plus, glm-5, glm-5-plus, glm-5.1, glm-5.1-plus | ✅ |
+| MiniMax (海螺AI) | minimax, minimax-auto, MiniMax-M2.5, MiniMax-M2.7 | ✅ |
 
 ## 功能特性
 

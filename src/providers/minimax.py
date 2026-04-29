@@ -80,12 +80,17 @@ class MiniMaxProvider(BaseProvider):
             "minimax",
             "minimax-auto",
             "MiniMax-M2.5",
+            "MiniMax-M2.7",
         ]
     
     def _get_model_option(self, model: str) -> Dict[str, Any]:
         model_lower = model.lower()
         if "auto" in model_lower or model_lower == "minimax":
             return {"display_name": "Auto", "model_type": 0}
+        elif "m2.7" in model_lower:
+            return {"display_name": "MiniMax-M2.7", "model_type": 502}
+        elif "m2.5" in model_lower:
+            return {"display_name": "MiniMax-M2.5", "model_type": 501}
         else:
             return {"display_name": "MiniMax-M2.5", "model_type": 501}
     

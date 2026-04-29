@@ -79,10 +79,11 @@ class KimiProvider(BaseProvider):
     BASE_URL = "https://www.kimi.com"
     
     SCENARIOS = {
+        "k2.6": "SCENARIO_K2D6",
         "k2.5": "SCENARIO_K2D5",
         "k2": "SCENARIO_K2",
         "k1.5": "SCENARIO_K1D5",
-        "default": "SCENARIO_K2D5"
+        "default": "SCENARIO_K2D6"
     }
     
     def __init__(self, token: Optional[str] = None, base_url: Optional[str] = None):
@@ -115,7 +116,17 @@ class KimiProvider(BaseProvider):
     
     @property
     def models(self) -> List[str]:
-        return ["kimi", "kimi-k2.5", "kimi-k2", "kimi-k1.5", "moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"]
+        return [
+            "kimi",
+            "kimi-k2.6",
+            "kimi-k2.6-code",
+            "kimi-k2.5",
+            "kimi-k2",
+            "kimi-k1.5",
+            "moonshot-v1-8k",
+            "moonshot-v1-32k",
+            "moonshot-v1-128k",
+        ]
     
     async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None:

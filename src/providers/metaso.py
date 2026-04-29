@@ -22,12 +22,14 @@ class MetasoProvider(BaseProvider):
     BASE_URL = "https://metaso.cn"
     
     SEARCH_MODES = {
+        "fast": {"mode": "fast", "scholar": False},
         "concise": {"mode": "concise", "scholar": False},
         "detail": {"mode": "detail", "scholar": False},
         "research": {"mode": "research", "scholar": False},
         "concise-scholar": {"mode": "concise", "scholar": True},
         "detail-scholar": {"mode": "detail", "scholar": True},
         "research-scholar": {"mode": "research", "scholar": True},
+        "default": "detail"
     }
     
     FAKE_HEADERS = {
@@ -68,8 +70,15 @@ class MetasoProvider(BaseProvider):
     @property
     def models(self) -> List[str]:
         return [
-            "metaso", "metaso-concise", "metaso-detail", "metaso-research",
-            "metaso-scholar", "metaso-concise-scholar", "metaso-detail-scholar", "metaso-research-scholar"
+            "metaso",
+            "metaso-fast",
+            "metaso-concise",
+            "metaso-detail",
+            "metaso-research",
+            "metaso-scholar",
+            "metaso-concise-scholar",
+            "metaso-detail-scholar",
+            "metaso-research-scholar"
         ]
     
     async def _get_client(self) -> httpx.AsyncClient:

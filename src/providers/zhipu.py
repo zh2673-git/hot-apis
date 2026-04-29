@@ -116,6 +116,10 @@ class ZhipuProvider(BaseProvider):
             "glm-4-long",
             "glm-4v",
             "glm-4v-plus",
+            "glm-5",
+            "glm-5-plus",
+            "glm-5.1",
+            "glm-5.1-plus",
         ]
     
     async def _get_client(self) -> httpx.AsyncClient:

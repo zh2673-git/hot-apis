@@ -42,7 +42,14 @@ class DeepSeekProvider(BaseProvider):
     
     @property
     def models(self) -> List[str]:
-        return ["deepseek-chat", "deepseek-reasoner", "deepseek", "deepseek-r1"]
+        return [
+            "deepseek-chat",
+            "deepseek-reasoner",
+            "deepseek-v4-flash",
+            "deepseek-v4-pro",
+            "deepseek",
+            "deepseek-r1",
+        ]
     
     async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None:
@@ -253,9 +260,18 @@ class DeepSeekProvider(BaseProvider):
         model_lower = model.lower()
         if "reasoner" in model_lower or "r1" in model_lower or "think" in model_lower:
             return "reasoner"
+        if "v4-pro" in model_lower or "v4.5" in model_lower:
+            return "reasoner"
         return "chat"
     
     def get_model_mapping(self, model: str) -> str:
+        model_lower = model.lower()
+        if "v4-pro" in model_lower:
+            return "deepseek-chat"
+        if "v4-flash" in model_lower:
+            return "deepseek-chat"
+        if "chat" in model_lower:
+            return "deepseek-chat"
         return "deepseek-chat"
     
     async def close(self):
