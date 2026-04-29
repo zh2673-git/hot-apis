@@ -158,68 +158,39 @@ async def list_models():
     models = []
     
     if settings.providers.deepseek.token:
-        models.extend([
-            ModelInfo(id="deepseek-chat", owned_by="deepseek"),
-            ModelInfo(id="deepseek-reasoner", owned_by="deepseek"),
-            ModelInfo(id="deepseek-r1", owned_by="deepseek"),
-        ])
+        provider = DeepSeekProvider(token=settings.providers.deepseek.token)
+        for model_id in provider.models:
+            models.append(ModelInfo(id=model_id, owned_by="deepseek"))
     
     if settings.providers.kimi.token:
-        models.extend([
-            ModelInfo(id="kimi", owned_by="moonshot"),
-            ModelInfo(id="kimi-k2.5", owned_by="moonshot"),
-            ModelInfo(id="moonshot-v1-8k", owned_by="moonshot"),
-            ModelInfo(id="moonshot-v1-32k", owned_by="moonshot"),
-            ModelInfo(id="moonshot-v1-128k", owned_by="moonshot"),
-        ])
+        provider = KimiProvider(token=settings.providers.kimi.token)
+        for model_id in provider.models:
+            models.append(ModelInfo(id=model_id, owned_by="moonshot"))
     
     if settings.providers.metaso.token:
-        models.extend([
-            ModelInfo(id="metaso", owned_by="metaso"),
-            ModelInfo(id="metaso-concise", owned_by="metaso"),
-            ModelInfo(id="metaso-detail", owned_by="metaso"),
-            ModelInfo(id="metaso-research", owned_by="metaso"),
-            ModelInfo(id="metaso-concise-scholar", owned_by="metaso"),
-            ModelInfo(id="metaso-detail-scholar", owned_by="metaso"),
-            ModelInfo(id="metaso-research-scholar", owned_by="metaso"),
-        ])
+        provider = MetasoProvider(token=settings.providers.metaso.token)
+        for model_id in provider.models:
+            models.append(ModelInfo(id=model_id, owned_by="metaso"))
     
     if settings.providers.doubao.token:
-        models.extend([
-            ModelInfo(id="doubao", owned_by="doubao"),
-            ModelInfo(id="doubao-pro", owned_by="doubao"),
-            ModelInfo(id="doubao-lite", owned_by="doubao"),
-            ModelInfo(id="doubao-1.5-pro", owned_by="doubao"),
-            ModelInfo(id="doubao-1.5-lite", owned_by="doubao"),
-        ])
+        provider = DoubaoProvider(token=settings.providers.doubao.token)
+        for model_id in provider.models:
+            models.append(ModelInfo(id=model_id, owned_by="doubao"))
     
     if settings.providers.qwen.token:
-        models.extend([
-            ModelInfo(id="qwen", owned_by="qwen"),
-            ModelInfo(id="qwen3", owned_by="qwen"),
-            ModelInfo(id="qwen3.5-plus", owned_by="qwen"),
-            ModelInfo(id="qwen3-max", owned_by="qwen"),
-            ModelInfo(id="qwen3-max-thinking", owned_by="qwen"),
-            ModelInfo(id="qwen3-flash", owned_by="qwen"),
-            ModelInfo(id="qwen3-coder", owned_by="qwen"),
-            ModelInfo(id="qwen-vl-plus", owned_by="qwen"),
-            ModelInfo(id="qwen-vl-max", owned_by="qwen"),
-            ModelInfo(id="qwen-long", owned_by="qwen"),
-        ])
+        provider = QwenProvider(token=settings.providers.qwen.token)
+        for model_id in provider.models:
+            models.append(ModelInfo(id=model_id, owned_by="qwen"))
     
     if settings.providers.zhipu.token:
-        models.extend([
-            ModelInfo(id="zhipu", owned_by="zhipu"),
-            ModelInfo(id="chatglm", owned_by="zhipu"),
-            ModelInfo(id="glm-5", owned_by="zhipu"),
-        ])
+        provider = ZhipuProvider(token=settings.providers.zhipu.token)
+        for model_id in provider.models:
+            models.append(ModelInfo(id=model_id, owned_by="zhipu"))
     
     if settings.providers.minimax.token:
-        models.extend([
-            ModelInfo(id="minimax", owned_by="minimax"),
-            ModelInfo(id="minimax-auto", owned_by="minimax"),
-            ModelInfo(id="MiniMax-M2.5", owned_by="minimax"),
-        ])
+        provider = MiniMaxProvider(token=settings.providers.minimax.token)
+        for model_id in provider.models:
+            models.append(ModelInfo(id=model_id, owned_by="minimax"))
     
     return ModelList(data=models)
 
