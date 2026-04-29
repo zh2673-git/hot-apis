@@ -45,6 +45,16 @@ python main.py
 
 服务将在 `http://localhost:8000` 启动。
 
+## ⚠️ 重要提示
+
+由于本项目采用 Web 逆向方式获取 API 接口，**Token 基于 Web 会话认证**，而非官方 API Key。因此：
+
+1. **Token 可能会过期**：Web Token 通常有会话时效限制，长时间未使用可能需要重新获取
+2. **如遇 401/403 错误**：请重新登录对应平台并获取新的 Token
+3. **建议**：定期检查 Token 有效性，或在 Token 过期后重新获取
+
+如遇到认证错误，请参考下方 Token 获取指南重新获取。
+
 ## Token 获取指南
 
 ### DeepSeek
