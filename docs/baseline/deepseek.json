@@ -1,0 +1,60 @@
+{
+  "non_stream": {
+    "status": 200,
+    "raw": "{\"id\":\"fb1b34e2-7e43-4d23-a610-7570e005c218@1\",\"object\":\"chat.completion\",\"created\":1789078286,\"model\":\"deepseek-flash\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"正常FINISHED\",\"name\":null},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":0,\"completion_tokens\":0,\"total_tokens\":0}}",
+    "normalized": {
+      "id": "<TEXT>",
+      "object": "chat.completion",
+      "created": "<TEXT>",
+      "model": "deepseek-flash",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": "<TEXT>",
+            "name": null
+          },
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": "<TEXT>",
+        "completion_tokens": "<TEXT>",
+        "total_tokens": "<TEXT>"
+      }
+    }
+  },
+  "stream": {
+    "status": 200,
+    "chunk_count": 3,
+    "normalized_frames": [
+      {
+        "id": "<TEXT>",
+        "created": "<TEXT>",
+        "model": "deepseek-flash",
+        "choices": [
+          {
+            "index": 0,
+            "delta": {
+              "content": "<TEXT>"
+            }
+          }
+        ]
+      },
+      {
+        "id": "<TEXT>",
+        "created": "<TEXT>",
+        "model": "deepseek-flash",
+        "choices": [
+          {
+            "index": 0,
+            "delta": {},
+            "finish_reason": "stop"
+          }
+        ]
+      },
+      "<DONE>"
+    ]
+  }
+}

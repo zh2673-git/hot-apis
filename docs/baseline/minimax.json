@@ -1,0 +1,73 @@
+{
+  "non_stream": {
+    "status": 200,
+    "raw": "{\"id\":\"440413783744662\",\"object\":\"chat.completion\",\"created\":1789078303,\"model\":\"MiniMax-M3\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"好的，我已收到你的请求，正在处理中。\",\"name\":null},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":0,\"completion_tokens\":0,\"total_tokens\":0}}",
+    "normalized": {
+      "id": "<TEXT>",
+      "object": "chat.completion",
+      "created": "<TEXT>",
+      "model": "MiniMax-M3",
+      "choices": [
+        {
+          "index": 0,
+          "message": {
+            "role": "assistant",
+            "content": "<TEXT>",
+            "name": null
+          },
+          "finish_reason": "stop"
+        }
+      ],
+      "usage": {
+        "prompt_tokens": "<TEXT>",
+        "completion_tokens": "<TEXT>",
+        "total_tokens": "<TEXT>"
+      }
+    }
+  },
+  "stream": {
+    "status": 200,
+    "chunk_count": 4,
+    "normalized_frames": [
+      {
+        "id": "<TEXT>",
+        "created": "<TEXT>",
+        "model": "MiniMax-M3",
+        "choices": [
+          {
+            "index": 0,
+            "delta": {
+              "content": "<TEXT>"
+            }
+          }
+        ]
+      },
+      {
+        "id": "<TEXT>",
+        "created": "<TEXT>",
+        "model": "MiniMax-M3",
+        "choices": [
+          {
+            "index": 0,
+            "delta": {
+              "content": "<TEXT>"
+            }
+          }
+        ]
+      },
+      {
+        "id": "<TEXT>",
+        "created": "<TEXT>",
+        "model": "MiniMax-M3",
+        "choices": [
+          {
+            "index": 0,
+            "delta": {},
+            "finish_reason": "stop"
+          }
+        ]
+      },
+      "<DONE>"
+    ]
+  }
+}
