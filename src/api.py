@@ -35,7 +35,10 @@ def get_provider_for_model(model: str) -> tuple[str, BaseProvider]:
         provider_name = "kimi"
         if provider_name not in providers:
             token = settings.providers.kimi.token
-            providers[provider_name] = KimiProvider(token=token)
+            providers[provider_name] = KimiProvider(
+                token=token,
+                refresh_token=settings.providers.kimi.refresh_token,
+            )
         return provider_name, providers[provider_name]
     
     if any(x in model_lower for x in ["metaso"]):
@@ -84,7 +87,10 @@ def get_provider_for_model(model: str) -> tuple[str, BaseProvider]:
         provider_name = "kimi"
         if provider_name not in providers:
             token = settings.providers.kimi.token
-            providers[provider_name] = KimiProvider(token=token)
+            providers[provider_name] = KimiProvider(
+                token=token,
+                refresh_token=settings.providers.kimi.refresh_token,
+            )
         return provider_name, providers[provider_name]
     
     if settings.providers.metaso.token:
@@ -163,7 +169,10 @@ async def list_models():
             models.append(ModelInfo(id=model_id, owned_by="deepseek"))
     
     if settings.providers.kimi.token:
-        provider = KimiProvider(token=settings.providers.kimi.token)
+        provider = KimiProvider(
+            token=settings.providers.kimi.token,
+            refresh_token=settings.providers.kimi.refresh_token,
+        )
         for model_id in provider.models:
             models.append(ModelInfo(id=model_id, owned_by="moonshot"))
     

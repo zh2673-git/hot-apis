@@ -23,6 +23,7 @@ class KimiConfig(BaseSettings):
     base_url: str = "https://www.kimi.com"
     enabled: bool = True
     token: Optional[str] = None
+    refresh_token: Optional[str] = None
 
 
 class MetasoConfig(BaseSettings):
@@ -79,6 +80,7 @@ class Config(BaseSettings):
         
         deepseek_token = os.getenv("DEEPSEEK_TOKEN")
         kimi_token = os.getenv("KIMI_TOKEN")
+        kimi_refresh_token = os.getenv("KIMI_REFRESH_TOKEN")
         metaso_token = os.getenv("METASO_TOKEN")
         doubao_token = os.getenv("DOUBAO_TOKEN")
         qwen_token = os.getenv("QWEN_TOKEN")
@@ -90,6 +92,8 @@ class Config(BaseSettings):
                 config_data["providers"]["deepseek"]["token"] = deepseek_token
             if kimi_token:
                 config_data["providers"]["kimi"]["token"] = kimi_token
+            if kimi_refresh_token:
+                config_data["providers"]["kimi"]["refresh_token"] = kimi_refresh_token
             if metaso_token:
                 config_data["providers"]["metaso"]["token"] = metaso_token
             if doubao_token:

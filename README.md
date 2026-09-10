@@ -78,15 +78,19 @@ python main.py
 ### Kimi (月之暗面)
 
 **获取方式**：
-1. 访问 [Kimi 官网](https://kimi.moonshot.cn/) 并登录
+1. 访问 [Kimi 官网](https://www.kimi.com/) 并登录
 2. 打开浏览器开发者工具 (F12)
 3. 切换到 Application 标签页
-4. 在左侧找到 Cookies -> https://kimi.moonshot.cn
-5. 找到 `kimi_access_token` 或 `access_token` 的值
+4. 在左侧找到 Local Storage -> https://www.kimi.com
+5. 复制 `access_token` 的值填到 `KIMI_TOKEN`，`refresh_token` 的值填到 `KIMI_REFRESH_TOKEN`
 
 **Token 格式**：JWT 格式，以 `eyJ` 开头的长字符串
 
-**原理**：Kimi 使用 WebSocket 进行实时通信，Token 用于建立连接时的身份验证。服务实现了 WebSocket 协议的完整逆向，包括消息帧的编解码。
+**有效期**：`access_token` 仅约 **15 分钟**有效；`refresh_token` 约 **90 天**。
+填了 `KIMI_REFRESH_TOKEN` 后，服务会在 access_token 临近过期时自动调用
+`https://auth.kimi.com/api/account.gateway.v1.AuthService/RefreshToken` 续期，无需手动更换。
+
+**原理**：Kimi 使用 Connect 协议（HTTP 上的二进制帧）通信，Token 用于身份验证。服务实现了消息帧的完整逆向，包括编解码。
 
 ---
 
@@ -351,6 +355,50 @@ A: 思维链内容会包含在响应中，以 `<think:...>` 格式标记。
 | MiniMax | 新增 `MiniMax-M3`（2026-06-01 发布，1M 上下文、原生多模态） |
 
 > **待实测项**：本项目通过 Web 逆向调用，部分平台使用内部编码而非官方模型 ID。Kimi 的 `SCENARIO_K3` / `SCENARIO_K2D7` 场景码、MiniMax M3 的 `model_type`（推导值 503）、千问与豆包的新模型内部编码，均依据既有命名规律推导，需用真实 Token 实测确认。
+
+## 已知问题（2026-09 真机实测）
+
+以下问题均通过真实抓包定位，**与本轮模型清单更新无关**，属上游接口变更。
+
+### 千问：站点已迁至风控网关，纯 HTTP 无法调用
+
+- 旧端点 `https://qianwen.biz.aliyun.com/dialog/conversation` 仍会响应，但只返回
+  「你正在使用较早版本，为了获得更好的对话体验，请升级至最新版。」（**所有模型**，含历史模型）
+- 站点已改为 `https://www.qianwen.com` 下的 `/api/v1/*` 与 `/api/v2/chat`，请求必须携带
+  `bx-ua`、`bx-umidtoken`、`clt-acs-sign`、`clt-acs-request-params`、`eo-clt-*`、`x-wpk-*`
+  等**由浏览器风控 SDK 在 JS 中生成的签名头**
+- 实测：纯 HTTP 直连 `/api/v1/model/list` 与 `/api/v2/chat` 均返回 **404**（网关拒绝路由）
+- **结论**：当前「纯 HTTP 客户端」架构下无法修复，需要浏览器代理（Playwright）方案
+
+### 秘塔：搜索端点已改版，但非浏览器客户端被限流
+
+- 搜索端点由 `GET /api/searchV2` 改为 **`POST /api/search/chat`**（OpenAI 风格请求体）：
+  ```json
+  {"model":"fast_thinking","stream":true,"mode":"detail",
+   "messages":[{"id":"temp-…","key":"temp-…","conversationId":"temp-…","role":"user",
+                "content":"…","markdownContent":"…","engineType":"quanwang"}]}
+  ```
+  `engineType` 取值（抓自 `/api/metaso-ai-config`）：`quanwang` 全网 / `scholar` 学术 / `pdf` / `podcast` 播客
+- 实测：纯 HTTP 调用返回 `200 text/event-stream`，先收到 `conversation_init` / `user_message_init` /
+  `response_message_init`，随后帧为 `{"msg":"Too Many Requests","code":429}`；浏览器会话可正常使用，
+  非浏览器客户端被限流
+- **结论**：协议已完全定位，但同样需要浏览器代理方案才能稳定调用
+
+### 其他
+
+- 豆包、智谱的 `models` 列表仅用于 `/v1/models` 展示，实际调用由平台侧 `bot_id` / `assistant_id` 决定
+- DeepSeek 的 Token 为 64 位非 JWT 串；因 DeepSeek 网页端允许匿名对话，实测通过**不能**排除匿名会话
+
+## 实测验证
+
+`verify_models.py` 会启动真实 uvicorn 服务并逐模型发起真实请求：
+
+```bash
+python verify_models.py                 # 本轮新增/变更的模型
+python verify_models.py --all           # 各平台 models 列表全量
+python verify_models.py --models kimi-k3 qwen3.7-max   # 指定模型（对照实验）
+python verify_models.py --stream        # 追加流式接口验证
+```
 
 ## License
 

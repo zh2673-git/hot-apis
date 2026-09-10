@@ -1,3 +1,4 @@
+import base64
 import httpx
 import json
 import struct
@@ -69,6 +70,17 @@ def decode_connect_stream(data: bytes) -> List[dict]:
     return messages
 
 
+def jwt_expiry(token: str) -> float:
+    """解析 JWT 的 exp（Unix 秒）；解析失败返回 0"""
+    try:
+        payload = token.split(".")[1]
+        payload += "=" * (-len(payload) % 4)
+        data = json.loads(base64.urlsafe_b64decode(payload))
+        return float(data.get("exp", 0) or 0)
+    except Exception:
+        return 0.0
+
+
 @dataclass
 class KimiChatSession:
     chat_id: str = ""
@@ -77,6 +89,8 @@ class KimiChatSession:
 
 class KimiProvider(BaseProvider):
     BASE_URL = "https://www.kimi.com"
+    # 账号网关独立域名：Token 续期与设备注册都在 auth.kimi.com
+    AUTH_BASE_URL = "https://auth.kimi.com"
     
     # 场景码按模型名子串匹配，取首个命中项（顺序敏感，短键必须排在长键之后）。
     # K3 / K2.7 的场景码依据既有命名规律（K2.6 -> SCENARIO_K2D6、K1.5 -> SCENARIO_K1D5）推导，
@@ -89,12 +103,14 @@ class KimiProvider(BaseProvider):
         "default": "SCENARIO_K3"
     }
     
-    def __init__(self, token: Optional[str] = None, base_url: Optional[str] = None):
+    def __init__(self, token: Optional[str] = None, base_url: Optional[str] = None,
+                 refresh_token: Optional[str] = None):
         super().__init__(token=token, base_url=base_url or self.BASE_URL)
         self._client: Optional[httpx.AsyncClient] = None
         self._device_id: str = generate_device_id()
         self._session_id: str = generate_session_id()
         self._traffic_id: str = ""
+        self._refresh_token: str = refresh_token or ""
         self._sessions: Dict[str, KimiChatSession] = {}
         
         self.headers = {
@@ -239,11 +255,46 @@ class KimiProvider(BaseProvider):
         
         return content
     
+    async def _ensure_token(self, client: httpx.AsyncClient) -> None:
+        """access_token 仅约 15 分钟有效，临近过期时用 refresh_token 自动续期"""
+        if not self._refresh_token:
+            return
+        if self.token and jwt_expiry(self.token) - time.time() > 60:
+            return
+
+        response = await client.post(
+            f"{self.AUTH_BASE_URL}/api/account.gateway.v1.AuthService/RefreshToken",
+            headers={
+                "accept": "application/json",
+                "content-type": "application/json",
+                "connect-protocol-version": "1",
+                "r-timezone": "Asia/Shanghai",
+                "x-msh-platform": "web",
+                "x-msh-device-id": self._device_id,
+                "x-msh-session-id": self._session_id,
+                "x-msh-version": "1.0.0",
+                "x-traffic-id": self._traffic_id,
+                "origin": "https://www.kimi.com",
+                "referer": "https://www.kimi.com/",
+                "user-agent": self.headers.get("user-agent", ""),
+            },
+            json={"refresh_token": self._refresh_token},
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        if data.get("accessToken"):
+            self.token = data["accessToken"]
+            self.headers["authorization"] = f"Bearer {self.token}"
+        if data.get("refreshToken"):
+            self._refresh_token = data["refreshToken"]
+
     async def chat_completion(
         self, request: ChatCompletionRequest
     ) -> ChatCompletionResponse:
         client = await self._get_client()
         
+        await self._ensure_token(client)
         await self._get_user_info(client)
         await self._register_device(client)
         
@@ -289,6 +340,7 @@ class KimiProvider(BaseProvider):
     ) -> AsyncGenerator[ChatCompletionChunk, None]:
         client = await self._get_client()
         
+        await self._ensure_token(client)
         await self._get_user_info(client)
         await self._register_device(client)
         
