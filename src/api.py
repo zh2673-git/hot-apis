@@ -141,7 +141,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="NXAPI - OpenAI Compatible API",
     description="大模型 API 中转站，支持 DeepSeek、Kimi、Metaso、豆包、千问、智谱清言和 MiniMax",
-    version="1.0.0",
+    version="1.3.0",
     lifespan=lifespan
 )
 
@@ -156,7 +156,7 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    return {"message": "NXAPI - OpenAI Compatible API", "version": "1.0.0"}
+    return {"message": "NXAPI - OpenAI Compatible API", "version": "1.3.0"}
 
 
 @app.get("/v1/models", response_model=ModelList)

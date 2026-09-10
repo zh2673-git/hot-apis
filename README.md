@@ -2,19 +2,22 @@
 
 一个统一的 OpenAI 兼容 API 中转服务，通过逆向工程实现对多个国内主流大模型平台的调用。
 
+> 当前版本 **v1.3.0**（2026-09-10）· 变更记录见 [模型更新记录](#模型更新记录) · 上游接口变更见 [已知问题](#已知问题2026-09-真机实测)
+
 ## 支持的平台
 
 | 平台 | 模型 | 状态 |
 |------|------|------|
 | DeepSeek | deepseek-flash, deepseek-reasoner, deepseek-chat, deepseek-v4-flash, deepseek-v4-pro, deepseek-r1 | ✅ |
-| Kimi (月之暗面) | kimi, kimi-k3, kimi-k2.7-code, kimi-k2.7-code-highspeed, kimi-k2.6 | ✅ |
-| Metaso (秘塔AI搜索) | metaso, metaso-fast, metaso-concise, metaso-detail, metaso-research, metaso-deep-research, metaso-scholar | ✅ |
+| Kimi (月之暗面) | kimi, kimi-k3, kimi-k2.7-code, kimi-k2.7-code-highspeed, kimi-k2.6 | ✅ 支持自动续期 |
+| Metaso (秘塔AI搜索) | metaso, metaso-fast, metaso-concise, metaso-detail, metaso-research, metaso-deep-research, metaso-scholar | ⚠️ 上游改版，暂不可用 |
 | 豆包 (字节跳动) | doubao, doubao-seed-2.1-pro, doubao-seed-2.1-turbo, doubao-seed-2.0-pro, doubao-pro, doubao-lite, doubao-seedream-3 | ✅ |
-| 千问 (通义千问) | qwen, qwen3, qwen3.7-max, qwen3.7-plus, qwen3.6-plus, qwen3.5-plus, qwen3-max, qwen3-flash, qwen3-coder, qwen-long | ✅ |
+| 千问 (通义千问) | qwen, qwen3, qwen3.8-max, qwen3.7-max, qwen3.6-flash | ⚠️ 上游改版，暂不可用 |
 | 智谱清言 (ChatGLM) | zhipu, chatglm, glm-5.3, glm-5.3-flash, glm-5.1, glm-5.1-plus, glm-5, glm-5-plus, glm-4-plus | ✅ |
 | MiniMax (海螺AI) | minimax, minimax-auto, MiniMax-M3, MiniMax-M2.7, MiniMax-M2.5 | ✅ |
 
-> 模型清单最后同步于 2026-09-10，各平台完整清单见 `src/providers/*.py` 的 `models` 属性与调用 `/v1/models`。
+> 模型清单最后同步于 2026-09-10，全部经真机实测（见 [实测验证](#实测验证)）；各平台完整清单见 `src/providers/*.py` 的 `models` 属性与 `GET /v1/models`。
+> 千问与秘塔的**清单已是站点真实值**，但 provider 因上游风控暂时无法调用，详见 [已知问题](#已知问题2026-09-真机实测)。
 
 ## 功能特性
 
@@ -22,6 +25,8 @@
 - **流式响应**：支持 SSE 流式输出
 - **多模型支持**：一个服务支持多个大模型平台
 - **思维链输出**：支持 DeepSeek R1、GLM 等模型的思维链内容输出
+- **Token 自动续期**：Kimi 的 `access_token` 仅约 15 分钟有效，配置 `KIMI_REFRESH_TOKEN` 后自动续期
+- **端到端实测脚本**：`verify_models.py` 启动真实 uvicorn 服务，逐模型验证连通性
 
 ## 快速开始
 
@@ -140,6 +145,9 @@ UM_distinctid=xxx; tongyi_sso_ticket=xxx; XSRF-TOKEN=xxx; ...
 ```
 
 **原理**：千问使用阿里云的 SSO 认证体系，需要完整的 Cookie 来通过身份验证。服务会自动解析 Cookie 中的关键信息。
+
+> ⚠️ **当前不可用**：千问站点已迁至风控网关，纯 HTTP 调用被拒绝（旧端点只回「请升级至最新版」），
+> 详见 [已知问题](#已知问题2026-09-真机实测)。模型清单已同步为站点真实值，待浏览器代理方案落地后即可使用。
 
 ---
 
@@ -286,8 +294,9 @@ nxapi/
 │       ├── zhipu.py        # 智谱 实现
 │       └── minimax.py      # MiniMax 实现
 ├── config.yaml             # 服务配置
-├── .env                    # Token 配置
+├── .env.example            # Token 配置模板（复制为 .env 使用）
 ├── requirements.txt        # 依赖列表
+├── verify_models.py        # 端到端实测脚本
 └── main.py                 # 启动脚本
 ```
 
@@ -307,12 +316,12 @@ nxapi/
 | 平台 | 认证方式 | 特殊处理 |
 |------|----------|----------|
 | DeepSeek | Bearer Token | PoW 挑战验证、SHA3 哈希计算 |
-| Kimi | JWT Token | WebSocket 通信、二进制帧编解码 |
-| Metaso | Cookie (uid+sid) | 搜索模式参数 |
+| Kimi | JWT Token | Connect 协议二进制帧编解码、**access_token 自动续期**（auth.kimi.com） |
+| Metaso | Cookie (uid+sid) | ⚠️ 搜索端点已改为 `POST /api/search/chat`，非浏览器客户端被限流 |
 | 豆包 | Session Cookie | 设备指纹生成、请求签名 |
-| 千问 | Cookie (SSO) | XSRF Token 处理 |
+| 千问 | Cookie (SSO) | ⚠️ 站点迁至 `www.qianwen.com` 风控网关，需浏览器 SDK 生成的签名头 |
 | 智谱 | JWT Token | MD5 签名、Token 自动刷新 |
-| MiniMax | JWT Token | LocalStorage Token 认证 |
+| MiniMax | JWT Token | Query 参数认证（`token`/`device_id`）+ MD5 签名（`x-signature` / `yy`） |
 
 ### 安全说明
 
@@ -340,21 +349,33 @@ A: 思维链内容会包含在响应中，以 `<think:...>` 格式标记。
 
 ## 模型更新记录
 
-### 2026-09-10
+### v1.3.0（2026-09-10）
 
-各平台均同步至当期最新模型：
+各平台同步至当期最新模型，并完成真机实测：
 
-| 平台 | 本次变更 |
-|------|----------|
-| DeepSeek | 新增 `deepseek-flash`（对应 V4.1 Flash，2026-09-10 发布，全面接替 V4 Pro）；`deepseek-v4-pro` 官方计划于 2026-09-14 12:00 下线，届时请求自动转由 V4.1 Flash 处理 |
-| Kimi | 新增 `kimi-k3`（2.8T 旗舰）、`kimi-k2.7-code`、`kimi-k2.7-code-highspeed`；移除已下线的 `kimi-k2.5`、`kimi-k2`、`kimi-k1.5` 与 `moonshot-v1` 系列（2026-08-31 起调用返回 404） |
-| Metaso | 新增 `metaso-deep-research` 别名（对应「深度研究」模式） |
-| 豆包 | 新增 `doubao-seed-2.1-pro`、`doubao-seed-2.1-turbo`（Seed 2.1 系列，2026-06-23 发布）与 `doubao-seed-2.0-pro` |
-| 千问 | 新增 `qwen3.7-max`、`qwen3.7-plus`（Qwen3.7 系列，2026-05 起发布） |
-| 智谱清言 | 新增 `glm-5.3`（旗舰，1M 上下文、思考常开）、`glm-5.3-flash`（原生多模态，2026-08-26 开源） |
-| MiniMax | 新增 `MiniMax-M3`（2026-06-01 发布，1M 上下文、原生多模态） |
+| 平台 | 本次变更 | 实测 |
+|------|----------|------|
+| DeepSeek | 新增 `deepseek-flash`（对应 V4.1 Flash，2026-09-10 发布，全面接替 V4 Pro）；`deepseek-v4-pro` 官方计划于 2026-09-14 12:00 下线，届时请求自动转由 V4.1 Flash 处理 | ✅ 1/1 |
+| Kimi | 新增 `kimi-k3`（2.8T 旗舰）、`kimi-k2.7-code`、`kimi-k2.7-code-highspeed`；移除已下线的 `kimi-k2.5`、`kimi-k2`、`kimi-k1.5` 与 `moonshot-v1` 系列（2026-08-31 起调用返回 404）；**新增 access_token 自动续期** | ✅ 3/3 |
+| Metaso | 新增 `metaso-deep-research` 别名（对应「深度研究」模式） | ⚠️ 上游改版 |
+| 豆包 | 新增 `doubao-seed-2.1-pro`、`doubao-seed-2.1-turbo`（Seed 2.1 系列，2026-06-23 发布）与 `doubao-seed-2.0-pro` | ✅ 3/3 |
+| 千问 | 清单改为站点真实值：`qwen3.8-max`（站点 newTag 最新）、`qwen3.7-max`、`qwen3.6-flash`、`qwen` | ⚠️ 上游改版 |
+| 智谱清言 | 新增 `glm-5.3`（旗舰，1M 上下文、思考常开）、`glm-5.3-flash`（原生多模态，2026-08-26 开源） | ✅ 2/2 |
+| MiniMax | 新增 `MiniMax-M3`（2026-06-01 发布，1M 上下文、原生多模态） | ✅ 1/1 |
 
-> **待实测项**：本项目通过 Web 逆向调用，部分平台使用内部编码而非官方模型 ID。Kimi 的 `SCENARIO_K3` / `SCENARIO_K2D7` 场景码、MiniMax M3 的 `model_type`（推导值 503）、千问与豆包的新模型内部编码，均依据既有命名规律推导，需用真实 Token 实测确认。
+**同时修复的两个既有缺陷**：
+
+1. **MiniMax 全模型 401**：`device_id` 误取自 JWT 的 `user.deviceID`（实际为空），而 Web 端用的是
+   客户端生成的 8 位数字 id（缓存在 `tab_device_id`）。抓包确认 `x-signature` 算法与密钥仍有效
+   （校验 4/4 匹配）、`token` 取值一致，差异仅在 `device_id`。修复后 `minimax` / `minimax-auto` /
+   `MiniMax-M3` / `MiniMax-M2.5` / `MiniMax-M2.7` 全部恢复。
+2. **Kimi 每 15 分钟失效**：`access_token` 短时有效，现支持用 `refresh_token` 调用
+   `https://auth.kimi.com/api/account.gateway.v1.AuthService/RefreshToken` 自动续期
+   （新增 `KIMI_REFRESH_TOKEN` 环境变量）。
+
+> **实测覆盖**：DeepSeek 1/1、Kimi 3/3、豆包 3/3、智谱 2/2、MiniMax 1/1（另含 4 个历史模型回归）。
+> 千问与秘塔的失败经历史模型对照实验确认为**上游接口变更**，与本轮清单更新无关，详见
+> [已知问题](#已知问题2026-09-真机实测)。
 
 ## 已知问题（2026-09 真机实测）
 

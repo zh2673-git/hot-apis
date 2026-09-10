@@ -52,19 +52,12 @@ class QwenProvider(BaseProvider):
     @property
     def models(self) -> List[str]:
         return [
+            # 站点 GET /api/v1/model/list 实际提供的模型（2026-09-10 真机抓取）
             "qwen",
             "qwen3",
+            "qwen3.8-max",
             "qwen3.7-max",
-            "qwen3.7-plus",
-            "qwen3.5-plus",
-            "qwen3.6-plus",
-            "qwen3-max",
-            "qwen3-max-thinking",
-            "qwen3-flash",
-            "qwen3-coder",
-            "qwen-vl-plus",
-            "qwen-vl-max",
-            "qwen-long",
+            "qwen3.6-flash",
         ]
     
     def _parse_token(self, token: str):
@@ -322,20 +315,13 @@ class QwenProvider(BaseProvider):
                                 )
     
     def get_model_mapping(self, model: str) -> str:
+        # 映射为站点真实的 modelCode（抓自 https://www.qianwen.com/api/v1/model/list）
         model_map = {
             "qwen": "Qwen",
             "qwen3": "Qwen",
-            "qwen3.5-plus": "Qwen3.5-Plus",
-            "qwen3.6-plus": "Qwen3.6-Plus",
-            "qwen3.7-plus": "Qwen3.7-Plus",
+            "qwen3.8-max": "Qwen3.8-Max",
             "qwen3.7-max": "Qwen3.7-Max",
-            "qwen3-max": "Qwen3-Max",
-            "qwen3-max-thinking": "Qwen3-Max-Thinking-Preview",
-            "qwen3-flash": "Qwen3-Flash",
-            "qwen3-coder": "Qwen3-Coder",
-            "qwen-vl-plus": "Qwen-VL-Max",
-            "qwen-vl-max": "Qwen-VL-Max",
-            "qwen-long": "Qwen-Long",
+            "qwen3.6-flash": "Qwen3.6-Flash",
         }
         return model_map.get(model.lower(), "Qwen")
     
