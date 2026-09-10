@@ -7,11 +7,17 @@
     F1 `<tool_call>{json}</tool_call>`
     F2 ```json ... ``` 围栏
     F3 裸 JSON 对象（含 name + arguments/parameters）
+    F4 XML 形态：`<tool_call><invoke name=".."><parameter name=".." string="true">值</parameter></invoke></tool_call>`
+       —— 模型在工具集较大时会习惯性退回这种自带类型标注的 XML（2026-09-11 用 13 工具链真机复现）
+    F5 DSML 标记：`<[字面量]||DSML|| calls>` / `<... invoke name="..">` / `<... parameter name=".." string="true">值</... parameter>`
+       —— 上游内置工具协议的原始标记形态（元素名与属性同 F4，区别只在标签里夹了 DSML 标记）；
+          先经 `_normalize_dsml` 归一成标准标签，再交给 F4 解析
 
 降级铁律（R2/I2）：任何解析失败都**降级为正文**，绝不抛出、绝不 5xx。
 """
 
 import json
+import re
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -87,6 +93,122 @@ def _arguments_as_text(arguments: Any) -> str:
     return json.dumps(arguments if arguments is not None else {}, ensure_ascii=False)
 
 
+# ---- F4：XML 形态（<invoke> / <parameter>） ------------------------------------
+
+_XML_INVOKE_RE = re.compile(r"<invoke\s+([^>]*?)>(.*?)</invoke>", re.S)
+_XML_PARAM_RE = re.compile(r"<parameter\s+([^>]*?)>(.*?)</parameter>", re.S)
+_XML_NAME_ATTR_RE = re.compile(r'name\s*=\s*"([^"]*)"')
+_XML_STRING_ATTR_RE = re.compile(r'string\s*=\s*"(true|false)"')
+
+
+def _coerce_value(text: str, string_attr: Optional[str]) -> Any:
+    """`string="false"` = 模型已声明该参数不是字符串 → 还原成 JSON 标量（5 → 5，true → True）"""
+    if string_attr == "false":
+        try:
+            return json.loads(text)
+        except Exception:
+            pass
+    return text
+
+
+def _calls_from_xml(body: str) -> List[Dict[str, Any]]:
+    """从 <invoke>/<parameter> 中提取调用（一个块可含多个 invoke）"""
+    calls: List[Dict[str, Any]] = []
+    for attrs, inner in _XML_INVOKE_RE.findall(body or ""):
+        name_match = _XML_NAME_ATTR_RE.search(attrs)
+        if not name_match or not name_match.group(1):
+            continue
+        arguments: Dict[str, Any] = {}
+        for param_attrs, value in _XML_PARAM_RE.findall(inner):
+            key_match = _XML_NAME_ATTR_RE.search(param_attrs)
+            if not key_match or not key_match.group(1):
+                continue
+            string_match = _XML_STRING_ATTR_RE.search(param_attrs)
+            arguments[key_match.group(1)] = _coerce_value(
+                value.strip(), string_match.group(1) if string_match else None
+            )
+        calls.append({"name": name_match.group(1), "arguments": arguments})
+    return calls
+
+
+def _calls_from_block(body: str) -> List[Dict[str, Any]]:
+    """一个候选块 → 调用列表：先 JSON（F1–F3），再 XML（F4）"""
+    call = _to_raw_call(_loads_object(body))
+    if call:
+        return [call]
+    return _calls_from_xml(body)
+
+
+# ---- F5：DSML 标记归一化 --------------------------------------------------------
+
+# 上游内置工具协议的标签形如 `<tool||DSML|| calls>` / `<||DSML|| invoke name="..">`：
+# 竖线为全角（U+FF5C）或 ASCII，「字面量 + 标记」两种前缀都可能出现。归一化后
+# 就是标准的 `<tool_call>` / `<invoke>` / `<parameter>`，直接复用 F4。
+_BAR_CLASS = "|｜"
+_DSML_TOKEN = r"[|｜]{2,}[ \t]*DSML[ \t]*[|｜]{2,}"
+_DSML_OPEN_RE = re.compile(r"<([A-Za-z_]*)" + _DSML_TOKEN + r"[ \t]*([A-Za-z_][A-Za-z0-9_]*)")
+_DSML_CLOSE_RE = re.compile(r"</([A-Za-z_]*)" + _DSML_TOKEN + r"[ \t]*([A-Za-z_][A-Za-z0-9_]*)")
+# 外壳元素名 → 归一为既有块标签，复用 F1 的块扫描
+_DSML_WRAPPER_NAMES = {"calls", "tool_calls", "toolcall", "tool_call"}
+# 可能的「半个标签」：尖括号 + 标签合法字符（字面量/斜线/空白/竖线），且还没有右尖括号
+_PARTIAL_TAIL_RE = re.compile(r"</?[A-Za-z_0-9 \t/|｜]*")
+
+
+def _dsml_element_name(name: str) -> str:
+    return "tool_call" if name in _DSML_WRAPPER_NAMES else name
+
+
+def _normalize_dsml(text: str) -> str:
+    """把 DSML 标记标签归一成标准 XML 标签（保持属性原样）"""
+    if not text or "DSML" not in text:
+        return text
+
+    def _open(match: "re.Match") -> str:
+        return "<" + _dsml_element_name(match.group(2))
+
+    def _close(match: "re.Match") -> str:
+        return "</" + _dsml_element_name(match.group(2))
+
+    return _DSML_CLOSE_RE.sub(_close, _DSML_OPEN_RE.sub(_open, text))
+
+
+def _is_partial_dsml(tail: str) -> bool:
+    """尾巴是否可能是「半个 DSML 标签」
+
+    上游会把标记切成任意碎片（实测出现过只来一个 `<`、或只来 `</` 与 `||DSML||` 分段）。
+    只要尾巴是「尖括号开头、尚未收到右尖括号、且只由标签合法字符组成」，就必须扣留——
+    否则 `</` 会先被当正文发出，随后不含尖括号的 `||DSML||` 再也无法被识别。
+    """
+    if not tail or ">" in tail:
+        return False
+    return bool(_PARTIAL_TAIL_RE.fullmatch(tail))
+
+
+class _DsmlNormalizer:
+    """流式归一化器：把 DSML 标签转成标准标签后再交给状态机
+
+    必须扣留「可能是半个标记」的尾巴，否则字面量前缀（如 `<tool`）会先被当正文吐出去，
+    标记收齐后又重复输出。
+    """
+
+    def __init__(self) -> None:
+        self._buffer = ""
+
+    def feed(self, chunk: str) -> str:
+        self._buffer += chunk or ""
+        if "DSML" in self._buffer or "<" in self._buffer:
+            index = self._buffer.rfind("<")
+            if index >= 0 and _is_partial_dsml(self._buffer[index:]):
+                head, self._buffer = self._buffer[:index], self._buffer[index:]
+                return _normalize_dsml(head)
+        text, self._buffer = self._buffer, ""
+        return _normalize_dsml(text)
+
+    def flush(self) -> str:
+        text, self._buffer = self._buffer, ""
+        return _normalize_dsml(text)
+
+
 def to_tool_calls(raw_calls: List[Dict[str, Any]]) -> List[ToolCall]:
     """补上 id/type，并把 arguments 封装为 JSON 字符串（OpenAI 规范）"""
     calls: List[ToolCall] = []
@@ -118,9 +240,9 @@ def _extract_fenced(text: str) -> Tuple[List[Dict[str, Any]], str]:
         inner = rest[start + len(FENCE):end]
         if inner.lstrip().lower().startswith("json"):
             inner = inner.lstrip()[4:]
-        call = _to_raw_call(_loads_object(inner))
-        if call:
-            calls.append(call)
+        found = _calls_from_block(inner)
+        if found:
+            calls.extend(found)
         else:
             pieces.append(rest[start:end + len(FENCE)])
         rest = rest[end + len(FENCE):]
@@ -132,6 +254,7 @@ def extract(text: str, enabled: bool = True) -> Tuple[str, List[Dict[str, Any]]]
     if not enabled or not text:
         return (text or ""), []
 
+    text = _normalize_dsml(text)
     calls: List[Dict[str, Any]] = []
     pieces: List[str] = []
     rest = text
@@ -146,9 +269,9 @@ def extract(text: str, enabled: bool = True) -> Tuple[str, List[Dict[str, Any]]]
             pieces.append(rest[start:])
             break
         body = rest[start + len(TOOL_CALL_OPEN):end]
-        call = _to_raw_call(_loads_object(body))
-        if call:
-            calls.append(call)
+        found = _calls_from_block(body)
+        if found:
+            calls.extend(found)
         else:
             pieces.append(rest[start:end + len(TOOL_CALL_CLOSE)])
         rest = rest[end + len(TOOL_CALL_CLOSE):]
@@ -162,6 +285,13 @@ def extract(text: str, enabled: bool = True) -> Tuple[str, List[Dict[str, Any]]]
         if call:
             calls.append(call)
             content = ""
+    if not calls:
+        # F4 兜底：模型没包 <tool_call> 外壳，直接吐了 <invoke>
+        found = _calls_from_xml(content)
+        if found:
+            calls.extend(found)
+            content = _XML_INVOKE_RE.sub("", content)
+            content = content.replace(TOOL_CALL_OPEN, "").replace(TOOL_CALL_CLOSE, "")
 
     return content.strip(), calls
 
@@ -178,6 +308,7 @@ class ToolCallStreamParser:
         self._buffer = ""
         self._decided = False
         self._calls: List[Dict[str, Any]] = []
+        self._dsml = _DsmlNormalizer()
 
     # -- 只读观测
 
@@ -194,7 +325,7 @@ class ToolCallStreamParser:
         if not self._enabled:
             return [Event(EventKind.CONTENT, text=chunk)] if chunk else []
         try:
-            return self._feed(chunk or "")
+            return self._feed(self._dsml.feed(chunk or ""))
         except Exception:
             # R2/I2：内部异常一律降级为正文
             pending, self._buffer = self._buffer, ""
@@ -205,11 +336,14 @@ class ToolCallStreamParser:
     def finish(self) -> List[Event]:
         events: List[Event] = []
         try:
+            if self._enabled:
+                self._buffer += self._dsml.flush()
             if self._state is ParseState.IN_TOOL_CALL:
-                call = _to_raw_call(_loads_object(self._buffer))
-                if call:
-                    self._calls.append(call)
-                    events.append(Event(EventKind.TOOL_CALL, call=call))
+                found = _calls_from_block(self._buffer)
+                if found:
+                    for call in found:
+                        self._calls.append(call)
+                        events.append(Event(EventKind.TOOL_CALL, call=call))
                 elif self._buffer:
                     events.append(Event(EventKind.CONTENT,
                                         text=TOOL_CALL_OPEN + self._buffer))
@@ -218,10 +352,11 @@ class ToolCallStreamParser:
                 inner = self._buffer
                 if inner.lstrip().lower().startswith("json"):
                     inner = inner.lstrip()[4:]
-                call = _to_raw_call(_loads_object(inner))
-                if call:
-                    self._calls.append(call)
-                    events.append(Event(EventKind.TOOL_CALL, call=call))
+                found = _calls_from_block(inner)
+                if found:
+                    for call in found:
+                        self._calls.append(call)
+                        events.append(Event(EventKind.TOOL_CALL, call=call))
                 elif inner:
                     events.append(Event(EventKind.CONTENT, text=FENCE + inner))
                 self._buffer = ""
@@ -248,11 +383,12 @@ class ToolCallStreamParser:
             events.append(Event(EventKind.CONTENT, text=head))
 
     def _emit_call(self, body: str, events: List[Event], wrap: str) -> None:
-        call = _to_raw_call(_loads_object(body))
-        if call:
-            self._calls.append(call)
-            events.append(Event(EventKind.TOOL_CALL, call=call))
-        elif body:
+        found = _calls_from_block(body)
+        if found:
+            for call in found:
+                self._calls.append(call)
+                events.append(Event(EventKind.TOOL_CALL, call=call))
+        elif body.strip():
             events.append(Event(EventKind.CONTENT, text=wrap.format(body=body)))
 
     def _feed(self, chunk: str) -> List[Event]:

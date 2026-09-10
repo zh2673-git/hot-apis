@@ -120,7 +120,7 @@
 
 | 四层 | 内容 |
 |---|---|
-| 数据规范 | `ParseState`（`NORMAL` / `IN_TOOL_CALL`）；`EventKind`（`CONTENT` / `TOOL_CALL`）；三种可接受格式的优先级表（F1 标签 / F2 围栏 / F3 裸 JSON） |
+| 数据规范 | `ParseState`（`NORMAL` / `IN_TOOL_CALL`）；`EventKind`（`CONTENT` / `TOOL_CALL`）；五种可接受格式的优先级表（F1 标签 / F2 围栏 / F3 裸 JSON / F4 XML / F5 DSML 归一化） |
 | 数据存储 | **生成级私有**：`self._buffer: str`、`self._state: ParseState`、`self._passthrough: bool`、`self._calls: list`。生命周期严格等于一次生成 |
 | 数据流转 | **状态机跳转**：`NORMAL --命中OPEN--> IN_TOOL_CALL --命中CLOSE--> NORMAL`；快路径嗅探决定 `passthrough` 分叉 |
 | 数据接口 | `feed(chunk) -> List[Event]`；`finish() -> List[Event]`；`has_tool_calls() -> bool`；模块级 `extract(text) -> (content, raw_calls)`；`to_tool_calls(raw) -> List[ToolCall]` |

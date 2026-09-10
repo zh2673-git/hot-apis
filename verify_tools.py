@@ -1,7 +1,7 @@
 """工具调用适配层 · 验证脚本
 
 两部分：
-  1) 单测（离线，无需 Token）：断言 A-R1/R2/R3、A-P1~P5、extract 三格式容错
+  1) 单测（离线，无需 Token）：断言 A-R1/R2/R3、A-P1~P5、extract 多格式容错（F1–F5）
   2) L 维度（真实请求）：用例集 U1–U5，统计各平台工具调用成功率（门槛 >= 80%）
 
 用法：
@@ -200,6 +200,97 @@ def unit_tests() -> int:
 
     content, calls = extract("今天北京晴，25 度。")
     checker.check("普通文本不误判", not calls and content == "今天北京晴，25 度。", f"{content!r}")
+
+    # ---- F4：XML 形态（fixture 取自 2026-09-11 真机复现：13 工具链下模型退出 JSON 格式）
+    xml_sample = (
+        '<tool_call>\n<invoke name="web_search">\n'
+        '<parameter name="query" string="true">苏州明天天气预报</parameter>\n'
+        '<parameter name="max_results" string="false">5</parameter>\n'
+        "</invoke>\n</tool_call>"
+    )
+    content, calls = extract(xml_sample)
+    checker.check("F4 XML invoke 整包解析",
+                  len(calls) == 1 and calls[0]["name"] == "web_search", f"{content!r} {calls}")
+    checker.check("F4 按 string 属性还原参数类型",
+                  bool(calls)
+                  and calls[0]["arguments"].get("query") == "苏州明天天气预报"
+                  and isinstance(calls[0]["arguments"].get("max_results"), int)
+                  and calls[0]["arguments"]["max_results"] == 5,
+                  str(calls))
+    checker.check("F4 正文已剥离干净", content == "", repr(content))
+
+    parser = ToolCallStreamParser()
+    events = []
+    for start in range(0, len(xml_sample), 7):
+        events += parser.feed(xml_sample[start:start + 7])
+    events += parser.finish()
+    stream_calls = [e.call for e in events if e.kind is EventKind.TOOL_CALL]
+    checker.check("F4 流式分片解析",
+                  len(stream_calls) == 1 and stream_calls[0]["name"] == "web_search",
+                  str(stream_calls))
+
+    multi = ('<tool_call><invoke name="a"><parameter name="x" string="true">1</parameter></invoke>'
+             '<invoke name="b"><parameter name="y" string="false">2</parameter></invoke></tool_call>')
+    content, calls = extract(multi)
+    checker.check("F4 一个外壳含多个 invoke",
+                  [call["name"] for call in calls] == ["a", "b"], str(calls))
+
+    content, calls = extract(
+        '<invoke name="web_search"><parameter name="query" string="true">q</parameter></invoke>')
+    checker.check("F4 无外壳裸 invoke 兜底",
+                  len(calls) == 1 and calls[0]["name"] == "web_search", str(calls))
+
+    # ---- F5：DSML 标记（真机抓取样本 + 首轮事件里的字面量前缀形态）
+    bar = chr(0xFF5C) * 2
+    newline = chr(10)
+    mark = bar + "DSML" + bar
+
+    incident = (
+        "<tool" + mark + " calls>" + newline
+        + "<tool" + mark + ' invoke name="web_search">' + newline
+        + "<tool" + mark + ' parameter name="query" string="true">苏州明天天气预报</tool' + mark + " parameter>" + newline
+        + "</tool" + mark + " invoke>" + newline
+        + "</tool" + mark + " calls>"
+    )
+    content, calls = extract(incident)
+    checker.check("F5 字面量前缀形态解析",
+                  len(calls) == 1 and calls[0]["name"] == "web_search", str(calls))
+    checker.check("F5 参数值正确",
+                  bool(calls) and calls[0]["arguments"].get("query") == "苏州明天天气预报",
+                  str(calls))
+    checker.check("F5 正文无残留标记", content == "", repr(content))
+
+    bare = (
+        "<" + mark + " calls>" + newline
+        + "<" + mark + ' invoke name="web_search">' + newline
+        + "<" + mark + ' parameter name="max_results" string="false">5</' + mark + " parameter>" + newline
+        + "</" + mark + " invoke>" + newline
+        + "</" + mark + " calls>"
+    )
+    content, calls = extract(bare)
+    checker.check("F5 无字面量前缀形态解析",
+                  len(calls) == 1 and calls[0]["name"] == "web_search", str(calls))
+    checker.check("F5 非字符串参数还原类型",
+                  bool(calls) and calls[0]["arguments"].get("max_results") == 5
+                  and isinstance(calls[0]["arguments"]["max_results"], int),
+                  str(calls))
+
+    for label, sample in (("字面量前缀形态", incident), ("无字面量前缀形态", bare)):
+        content, calls = extract(sample)
+        checker.check(f"F5 {label}整包解析",
+                      len(calls) == 1 and calls[0]["name"] == "web_search", str(calls))
+        for size in (1, 2, 5):
+            stream_parser = ToolCallStreamParser()
+            stream_events = []
+            for start in range(0, len(sample), size):
+                stream_events += stream_parser.feed(sample[start:start + size])
+            stream_events += stream_parser.finish()
+            got = [e.call for e in stream_events if e.kind is EventKind.TOOL_CALL]
+            checker.check(f"F5 {label}流式分片({size}字)解析",
+                          len(got) == 1 and got[0]["name"] == "web_search", str(got))
+            leaked = "".join(e.text or "" for e in stream_events if e.kind is EventKind.CONTENT)
+            checker.check(f"F5 {label}分片({size}字)无标记泄漏",
+                          not leaked.strip(), repr(leaked[:80]))
 
     # ---- to_tool_calls 封装
     built = to_tool_calls([{"name": "get_weather", "arguments": {"city": "北京"}}])
