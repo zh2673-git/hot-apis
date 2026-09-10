@@ -1,6 +1,8 @@
 import asyncio
 import httpx
 import json
+import random
+import string
 import time
 import uuid
 import hashlib
@@ -23,6 +25,10 @@ def generate_uuid() -> str:
 
 def generate_uuid_no_dash() -> str:
     return uuid.uuid4().hex
+
+
+def generate_device_id() -> str:
+    return ''.join(random.choices(string.digits, k=8))
 
 
 def decode_jwt_payload(token: str) -> Dict:
@@ -69,6 +75,10 @@ class MiniMaxProvider(BaseProvider):
             user = payload.get("user", {})
             self._user_id = user.get("id", "")
             self._device_id = user.get("deviceID", "")
+        if not self._device_id:
+            # Web 端的 device_id 由客户端生成（8 位数字，缓存在 tab_device_id），
+            # JWT 里的 user.deviceID 通常为空；发送空值会被上游判为 401。
+            self._device_id = generate_device_id()
     
     @property
     def name(self) -> str:

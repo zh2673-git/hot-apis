@@ -153,6 +153,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="模型可用性实测")
     parser.add_argument("platforms", nargs="*", help="要验证的平台，缺省为全部")
     parser.add_argument("--all", action="store_true", help="验证各平台 models 列表中的全部模型")
+    parser.add_argument("--models", nargs="*", help="只验证指定模型名（跨平台，用于对照实验）")
     parser.add_argument("--stream", action="store_true", help="追加流式接口验证")
     parser.add_argument("--timeout", type=float, default=120.0, help="单请求超时（秒）")
     args = parser.parse_args()
@@ -188,8 +189,15 @@ def main() -> int:
                     skipped.append(platform)
                     continue
 
-                models = (list(PROVIDERS[platform](token="x").models)
-                          if args.all else CHANGED_MODELS[platform])
+                declared = list(PROVIDERS[platform](token="x").models)
+                if args.models:
+                    models = [m for m in args.models if m in declared]
+                elif args.all:
+                    models = declared
+                else:
+                    models = CHANGED_MODELS[platform]
+                if not models:
+                    continue
                 print(f"\n=== {platform} ({len(models)} 个模型) ===")
                 for model in models:
                     status, elapsed, detail = check_once(client, base, model, args.timeout)
