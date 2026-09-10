@@ -2,7 +2,7 @@
 
 一个统一的 OpenAI 兼容 API 中转服务，通过逆向工程实现对多个国内主流大模型平台的调用。
 
-> 当前版本 **v1.3.0**（2026-09-10）· 变更记录见 [模型更新记录](#模型更新记录) · 上游接口变更见 [已知问题](#已知问题2026-09-真机实测)
+> 当前版本 **v1.4.0**（2026-09-11）· 变更记录见 [模型更新记录](#模型更新记录) · 上游接口变更见 [已知问题](#已知问题2026-09-真机实测)
 
 ## 支持的平台
 
@@ -26,7 +26,75 @@
 - **多模型支持**：一个服务支持多个大模型平台
 - **思维链输出**：支持 DeepSeek R1、GLM 等模型的思维链内容输出
 - **Token 自动续期**：Kimi 的 `access_token` 仅约 15 分钟有效，配置 `KIMI_REFRESH_TOKEN` 后自动续期
+- **工具调用（Agent 支持）**：支持 OpenAI 标准 `tools` / `tool_calls` / `role:"tool"`，
+  可直接作为 Cline / Roo Code / Continue / OpenCode 等 agent 的模型后端（见下方专章）
 - **端到端实测脚本**：`verify_models.py` 启动真实 uvicorn 服务，逐模型验证连通性
+
+## 工具调用（Agent 支持）
+
+`/v1/chat/completions` 支持 OpenAI 标准工具调用协议，可直接接入 agent 客户端。
+
+**原理**：上游是 Web 逆向的聊天接口，**不具备原生 function calling**（没有 `tools` 参数可透传）。
+因此本项目内置一个**无状态的协议翻译层**（`src/tools/`）：把 `tools` 规范与完整对话历史
+渲染进提示词，再把模型输出解析回标准 `tool_calls`。
+设计文档见 [docs/01-项目方案.md](docs/01-项目方案.md)、[docs/03-模块设计.md](docs/03-模块设计.md)。
+
+### 用法
+
+```bash
+curl http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "deepseek-flash",
+    "messages": [{"role": "user", "content": "北京今天天气怎么样？"}],
+    "tools": [{
+      "type": "function",
+      "function": {
+        "name": "get_weather",
+        "description": "查询指定城市的天气",
+        "parameters": {"type": "object",
+                       "properties": {"city": {"type": "string"}},
+                       "required": ["city"]}
+      }
+    }],
+    "stream": false
+  }'
+```
+
+响应中 `choices[0].message.tool_calls` 为标准结构，`finish_reason` 为 `tool_calls`；
+把执行结果以 `{"role": "tool", "tool_call_id": "call_xxx", "content": "..."}` 回传即可继续多轮。
+
+### 支持矩阵（真机实测 2026-09-11）
+
+| 平台 | 工具调用 | 门槛内成功率 | 备注 |
+|---|---|---|---|
+| DeepSeek | ✅ | 100%（4/4） | 支持一轮多工具调用 |
+| Kimi | ✅ | 100%（4/4） | 支持一轮多工具调用 |
+| 豆包 | ✅ | 100%（4/4） | 需并行调用时倾向直接自答 |
+| 智谱清言 | ⚠️ | 50%（2/4） | provider 间歇性返回空（既有问题），**暂不建议用于 agent** |
+| MiniMax | 未测 | — | — |
+| 千问 / 秘塔 | ❌ | — | 上游风控 / 限流，provider 当前不可用 |
+
+> 成功率为门槛内用例（U1/U2/U3/U5）统计，门槛 ≥80%，详见
+> [docs/test-report-v1.md](docs/test-report-v1.md)。
+
+### 注意事项
+
+- **建议走流式**：上游非流式延迟高（MiniMax 实测 30–40s），agent 场景请用 `stream: true`
+- **不要高频压测**：Web 逆向通道会触发上游限流（实测同一平台连续调用约 12 次后开始返回空）
+- **`tool_choice`** 支持 `"auto"` / `"none"` / `"required"` / `{"type":"function","function":{"name":...}}`
+- **解析容错**：同时识别 `<tool_call>{json}</tool_call>`、```json 围栏、裸 JSON 三种格式；
+  解析失败一律**降级为普通文本**，不返回 5xx
+- **不传 `tools` 时行为与改造前逐字段一致**（由 `capture_baseline.py` 守护该不变量）
+
+### 验证
+
+```bash
+python verify_tools.py                # 离线单测（24 条断言）
+python verify_tools.py --llm          # L 维度：真实工具调用用例 U1–U5
+python verify_tools.py --soak 100     # I5：无状态泄漏（100 次混合请求）
+python capture_baseline.py --compare  # I1：不传 tools 时响应结构等价
+```
 
 ## 快速开始
 
@@ -409,6 +477,18 @@ A: 思维链内容会包含在响应中，以 `<think:...>` 格式标记。
 
 - 豆包、智谱的 `models` 列表仅用于 `/v1/models` 展示，实际调用由平台侧 `bot_id` / `assistant_id` 决定
 - DeepSeek 的 Token 为 64 位非 JWT 串；因 DeepSeek 网页端允许匿名对话，实测通过**不能**排除匿名会话
+
+### 智谱清言：provider 间歇性返回空
+
+- 现象：连**非 tools 路径**下 `glm-*` 全部返回空内容（0.1~0.6s 快速返回），16/16 模型复现
+- 对照实验：短问题 / 长 prompt、带 / 不带 `tools` 均复现 → **与工具调用层无关**
+- `ZHIPU_TOKEN`（refresh 型）有效期正常（至 2027-03），疑为其 access_token 获取流程失效
+
+### Web 逆向通道抗压能力有限（高频调用触发上游限流）
+
+- 实测：对同一平台连续调用约 **12 次**后开始返回空，且 tools 与非 tools 路径**同时**失效
+- 纯 provider 对照（不经 relay、不经工具层）同样 `0/20` → 属**上游限流 / 配额**，非本项目缺陷
+- 影响：agent 长会话或高频调用场景建议降低并发；根治方案是改用官方 API（见文末演进路径）
 
 ## 实测验证
 

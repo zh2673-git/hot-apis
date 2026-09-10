@@ -28,33 +28,31 @@
   "stream": {
     "status": 200,
     "chunk_count": 3,
-    "normalized_frames": [
-      {
-        "id": "<TEXT>",
-        "created": "<TEXT>",
-        "model": "doubao-seed-2.1-pro",
-        "choices": [
-          {
-            "index": 0,
-            "delta": {
-              "content": "<TEXT>"
-            }
+    "has_content": true,
+    "content_shape": {
+      "id": "<TEXT>",
+      "created": "<TEXT>",
+      "model": "doubao-seed-2.1-pro",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {
+            "content": "<TEXT>"
           }
-        ]
-      },
-      {
-        "id": "<TEXT>",
-        "created": "<TEXT>",
-        "model": "doubao-seed-2.1-pro",
-        "choices": [
-          {
-            "index": 0,
-            "delta": {},
-            "finish_reason": "stop"
-          }
-        ]
-      },
-      "<DONE>"
-    ]
+        }
+      ]
+    },
+    "finish_shape": {
+      "id": "<TEXT>",
+      "created": "<TEXT>",
+      "model": "doubao-seed-2.1-pro",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {},
+          "finish_reason": "stop"
+        }
+      ]
+    }
   }
 }

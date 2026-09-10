@@ -16,6 +16,7 @@ from .models import (
     ModelList, ModelInfo
 )
 from .providers import DeepSeekProvider, KimiProvider, MetasoProvider, DoubaoProvider, QwenProvider, ZhipuProvider, MiniMaxProvider, BaseProvider
+from .tools import pipeline as tools_pipeline
 
 
 providers: Dict[str, BaseProvider] = {}
@@ -141,7 +142,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="NXAPI - OpenAI Compatible API",
     description="大模型 API 中转站，支持 DeepSeek、Kimi、Metaso、豆包、千问、智谱清言和 MiniMax",
-    version="1.3.0",
+    version="1.4.0",
     lifespan=lifespan
 )
 
@@ -156,7 +157,7 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    return {"message": "NXAPI - OpenAI Compatible API", "version": "1.3.0"}
+    return {"message": "NXAPI - OpenAI Compatible API", "version": "1.4.0"}
 
 
 @app.get("/v1/models", response_model=ModelList)
@@ -209,16 +210,65 @@ async def chat_completions(
     request: ChatCompletionRequest,
     authorization: Optional[str] = Header(None)
 ):
+    # ---- R1：不传 tools 时完全走原路径（旧逻辑一行未改，结构性保证 I1）----
+    if not request.tools:
+        # C2：content 放宽为可选后，在非 tools 路径显式拦截，避免语义缝隙
+        if any(message.content is None for message in request.messages):
+            raise HTTPException(
+                status_code=400,
+                detail="content is required when tools are not provided",
+            )
+
+        try:
+            provider_name, provider = get_provider_for_model(request.model)
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+        if request.stream:
+            return StreamingResponse(
+                stream_chat_completion(provider, request),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "X-Accel-Buffering": "no",
+                }
+            )
+
+        try:
+            response = await provider.chat_completion(request)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+        # I1：剥离本次新增字段，保持非 tools 响应与改造前逐字段等价
+        payload = response.model_dump()
+        message = payload["choices"][0]["message"]
+        message.pop("tool_calls", None)
+        message.pop("tool_call_id", None)
+        return JSONResponse(payload)
+
+    # ---- 工具调用路径（方案 A：提示词模拟）----
+    # R4：role=tool 必须携带 tool_call_id
+    if any(message.role == "tool" and not message.tool_call_id for message in request.messages):
+        raise HTTPException(
+            status_code=400,
+            detail="tool_call_id is required when role is tool",
+        )
+
     try:
         provider_name, provider = get_provider_for_model(request.model)
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-    
+
+    prepared = tools_pipeline.prepare(request)
+
     if request.stream:
         return StreamingResponse(
-            stream_chat_completion(provider, request),
+            tools_pipeline.stream(prepared, provider, request),
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
@@ -226,12 +276,14 @@ async def chat_completions(
                 "X-Accel-Buffering": "no",
             }
         )
-    else:
-        try:
-            response = await provider.chat_completion(request)
-            return response
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+
+    try:
+        upstream = await provider.chat_completion(prepared.request)
+        upstream_text = upstream.choices[0].message.content or "" if upstream.choices else ""
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return tools_pipeline.build_response(prepared, upstream_text)
 
 
 async def stream_chat_completion(

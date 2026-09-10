@@ -9,6 +9,12 @@ from .schemas import (
     Usage,
     ModelInfo,
     ModelListResponse,
+    FunctionCall,
+    FunctionCallDelta,
+    FunctionDef,
+    ToolCall,
+    ToolCallDelta,
+    ToolDef,
 )
 
 ModelList = ModelListResponse
@@ -25,4 +31,10 @@ __all__ = [
     "ModelInfo",
     "ModelListResponse",
     "ModelList",
+    "FunctionCall",
+    "FunctionCallDelta",
+    "FunctionDef",
+    "ToolCall",
+    "ToolCallDelta",
+    "ToolDef",
 ]

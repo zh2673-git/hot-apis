@@ -28,46 +28,31 @@
   "stream": {
     "status": 200,
     "chunk_count": 4,
-    "normalized_frames": [
-      {
-        "id": "<TEXT>",
-        "created": "<TEXT>",
-        "model": "MiniMax-M3",
-        "choices": [
-          {
-            "index": 0,
-            "delta": {
-              "content": "<TEXT>"
-            }
+    "has_content": true,
+    "content_shape": {
+      "id": "<TEXT>",
+      "created": "<TEXT>",
+      "model": "MiniMax-M3",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {
+            "content": "<TEXT>"
           }
-        ]
-      },
-      {
-        "id": "<TEXT>",
-        "created": "<TEXT>",
-        "model": "MiniMax-M3",
-        "choices": [
-          {
-            "index": 0,
-            "delta": {
-              "content": "<TEXT>"
-            }
-          }
-        ]
-      },
-      {
-        "id": "<TEXT>",
-        "created": "<TEXT>",
-        "model": "MiniMax-M3",
-        "choices": [
-          {
-            "index": 0,
-            "delta": {},
-            "finish_reason": "stop"
-          }
-        ]
-      },
-      "<DONE>"
-    ]
+        }
+      ]
+    },
+    "finish_shape": {
+      "id": "<TEXT>",
+      "created": "<TEXT>",
+      "model": "MiniMax-M3",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {},
+          "finish_reason": "stop"
+        }
+      ]
+    }
   }
 }

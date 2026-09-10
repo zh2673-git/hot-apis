@@ -93,8 +93,13 @@ def has_token(platform: str) -> bool:
     return bool(getattr(settings.providers, platform).token)
 
 
-def record(client: httpx.Client, base: str, platform: str, model: str, timeout: float) -> dict:
-    os.makedirs(OUT_DIR, exist_ok=True)
+def record(client: httpx.Client, base: str, platform: str, model: str, timeout: float,
+           persist: bool = False) -> dict:
+    """采集当前响应；**只有 persist=True 才写盘**
+
+    关键：--compare 模式绝不能覆盖基线，否则会拿"改造后"当基准，
+    比对必然通过 —— 那是自欺欺人的验证。
+    """
     record_data = {}
 
     resp = client.post(f"{base}/v1/chat/completions", json=build_payload(model, False), timeout=timeout)
@@ -107,44 +112,67 @@ def record(client: httpx.Client, base: str, platform: str, model: str, timeout: 
     chunks = []
     with client.stream("POST", f"{base}/v1/chat/completions",
                        json=build_payload(model, True), timeout=timeout) as sresp:
-        record_data["stream"] = {"status": sresp.status_code}
+        stream_status = sresp.status_code
         for line in sresp.iter_lines():
             if line.startswith("data: "):
                 chunks.append(line[6:].strip())
-    record_data["stream"]["chunk_count"] = len(chunks)
-    record_data["stream"]["normalized_frames"] = [
-        "<DONE>" if c == "[DONE]" else normalize(json.loads(c))
-        for c in chunks if c == "[DONE]" or c.startswith("{")
-    ]
 
-    path = os.path.join(OUT_DIR, f"{platform}.json")
-    with open(path, "w", encoding="utf-8") as handle:
-        json.dump(record_data, handle, ensure_ascii=False, indent=2)
+    frames = [normalize(json.loads(c)) for c in chunks if c.startswith("{")]
+
+    def _delta(frame):
+        choices = frame.get("choices") or []
+        return (choices[0].get("delta") or {}) if choices else {}
+
+    content_frames = [f for f in frames if "content" in _delta(f)]
+    record_data["stream"] = {
+        "status": stream_status,
+        "chunk_count": len(chunks),
+        # 上游是否真的产出了内容：用于区分「结构回归」与「上游空响应」
+        "has_content": bool(content_frames),
+        "content_shape": content_frames[0] if content_frames else None,
+        "finish_shape": frames[-1] if frames else None,
+    }
+
+    if persist:
+        os.makedirs(OUT_DIR, exist_ok=True)
+        path = os.path.join(OUT_DIR, f"{platform}.json")
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(record_data, handle, ensure_ascii=False, indent=2)
     return record_data
 
 
 def compare(platform: str, current: dict) -> tuple:
+    """按「帧形状」比对；上游空响应记为 SKIP（非回归），不与结构回归混淆"""
     path = os.path.join(OUT_DIR, f"{platform}.json")
     if not os.path.exists(path):
-        return False, ["基线不存在"]
+        return False, ["基线不存在"], []
+
     with open(path, encoding="utf-8") as handle:
         baseline = json.load(handle)
 
-    diffs = []
+    diffs: list = []
+    notes: list = []
+
     if baseline["non_stream"]["normalized"] != current["non_stream"]["normalized"]:
         diffs.append("非流式：结构不一致")
         diffs.append("  baseline: " + json.dumps(baseline["non_stream"]["normalized"], ensure_ascii=False)[:400])
         diffs.append("  current : " + json.dumps(current["non_stream"]["normalized"], ensure_ascii=False)[:400])
 
-    b_frames = baseline["stream"]["normalized_frames"]
-    c_frames = current["stream"]["normalized_frames"]
-    if b_frames and c_frames and b_frames[-1] != c_frames[-1]:
-        diffs.append("流式：终止帧不一致")
-    if (b_frames[0] if b_frames else None) != (c_frames[0] if c_frames else None):
-        diffs.append("流式：首帧结构不一致")
-        diffs.append("  baseline: " + json.dumps(b_frames[0] if b_frames else None, ensure_ascii=False)[:300])
-        diffs.append("  current : " + json.dumps(c_frames[0] if c_frames else None, ensure_ascii=False)[:300])
-    return (not diffs), diffs
+    base_stream, cur_stream = baseline["stream"], current["stream"]
+
+    if cur_stream["content_shape"] is None and base_stream.get("content_shape") is not None:
+        notes.append("流式：上游本次未产出内容 → 跳过内容帧比对（非回归）")
+    elif base_stream.get("content_shape") != cur_stream["content_shape"]:
+        diffs.append("流式：内容帧结构不一致")
+        diffs.append("  baseline: " + json.dumps(base_stream.get("content_shape"), ensure_ascii=False)[:300])
+        diffs.append("  current : " + json.dumps(cur_stream["content_shape"], ensure_ascii=False)[:300])
+
+    if base_stream.get("finish_shape") != cur_stream["finish_shape"]:
+        diffs.append("流式：终止帧结构不一致")
+        diffs.append("  baseline: " + json.dumps(base_stream.get("finish_shape"), ensure_ascii=False)[:300])
+        diffs.append("  current : " + json.dumps(cur_stream["finish_shape"], ensure_ascii=False)[:300])
+
+    return (not diffs), diffs, notes
 
 
 def main() -> int:
@@ -180,14 +208,17 @@ def main() -> int:
                     continue
                 model = DEFAULT_MODELS[platform]
                 print(f"\n=== {platform} / {model} ===")
-                current = record(client, base, platform, model, args.timeout)
+                current = record(client, base, platform, model, args.timeout,
+                                 persist=args.record and not args.compare)
                 print(f"  非流式状态: {current['non_stream']['status']}"
                       f" | 流式帧数: {current['stream']['chunk_count']}")
                 print("  非流式结构: "
                       + json.dumps(current["non_stream"]["normalized"], ensure_ascii=False)[:300])
                 if args.compare:
-                    ok, diffs = compare(platform, current)
+                    ok, diffs, notes = compare(platform, current)
                     print(f"  I1 判定: {'✅ 等价' if ok else '❌ 不等价'}")
+                    for line in notes:
+                        print("    [SKIP]", line)
                     for line in diffs:
                         print("   ", line)
                     if not ok:
