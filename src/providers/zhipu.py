@@ -108,6 +108,12 @@ class ZhipuProvider(BaseProvider):
         return [
             "zhipu",
             "chatglm",
+            "glm-5.3",
+            "glm-5.3-flash",
+            "glm-5.1",
+            "glm-5.1-plus",
+            "glm-5",
+            "glm-5-plus",
             "glm-4",
             "glm-4-plus",
             "glm-4-air",
@@ -116,10 +122,6 @@ class ZhipuProvider(BaseProvider):
             "glm-4-long",
             "glm-4v",
             "glm-4v-plus",
-            "glm-5",
-            "glm-5-plus",
-            "glm-5.1",
-            "glm-5.1-plus",
         ]
     
     async def _get_client(self) -> httpx.AsyncClient:

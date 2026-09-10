@@ -62,3 +62,6 @@ coverage.xml
 *.temp
 temp/
 tmp/
+
+# 本地工具：从本机浏览器配置提取 Token（含本机路径，不入库）
+grab_tokens.py

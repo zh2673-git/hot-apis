@@ -79,20 +79,24 @@ class MiniMaxProvider(BaseProvider):
         return [
             "minimax",
             "minimax-auto",
-            "MiniMax-M2.5",
+            "MiniMax-M3",
             "MiniMax-M2.7",
+            "MiniMax-M2.5",
         ]
     
     def _get_model_option(self, model: str) -> Dict[str, Any]:
         model_lower = model.lower()
         if "auto" in model_lower or model_lower == "minimax":
             return {"display_name": "Auto", "model_type": 0}
+        # model_type 为 Web 端内部枚举（M2.5=501、M2.7=502），M3 按递增规律推导，建议用真实 Token 实测确认。
+        elif "m3" in model_lower:
+            return {"display_name": "MiniMax-M3", "model_type": 503}
         elif "m2.7" in model_lower:
             return {"display_name": "MiniMax-M2.7", "model_type": 502}
         elif "m2.5" in model_lower:
             return {"display_name": "MiniMax-M2.5", "model_type": 501}
         else:
-            return {"display_name": "MiniMax-M2.5", "model_type": 501}
+            return {"display_name": "MiniMax-M3", "model_type": 503}
     
     async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None:

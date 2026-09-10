@@ -78,6 +78,9 @@ class DoubaoProvider(BaseProvider):
     def models(self) -> List[str]:
         return [
             "doubao",
+            "doubao-seed-2.1-pro",
+            "doubao-seed-2.1-turbo",
+            "doubao-seed-2.0-pro",
             "doubao-pro",
             "doubao-lite",
             "doubao-pro-v1",
@@ -437,6 +440,12 @@ class DoubaoProvider(BaseProvider):
     
     def get_model_mapping(self, model: str) -> str:
         model_lower = model.lower()
+        if "seed-2.1" in model_lower or "seed-2-1" in model_lower:
+            if "turbo" in model_lower:
+                return "Doubao-Seed-2.1-turbo"
+            return "Doubao-Seed-2.1-pro"
+        if "seed-2.0" in model_lower or "seed-2-0" in model_lower:
+            return "Doubao-Seed-2-0-Pro"
         if "seedream" in model_lower:
             return "Doubao-Seed-2-0-Pro"
         if "pro-v1" in model_lower or "1.5-pro" in model_lower:

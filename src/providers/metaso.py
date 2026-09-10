@@ -75,6 +75,7 @@ class MetasoProvider(BaseProvider):
             "metaso-concise",
             "metaso-detail",
             "metaso-research",
+            "metaso-deep-research",
             "metaso-scholar",
             "metaso-concise-scholar",
             "metaso-detail-scholar",

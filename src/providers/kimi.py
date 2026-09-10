@@ -78,12 +78,15 @@ class KimiChatSession:
 class KimiProvider(BaseProvider):
     BASE_URL = "https://www.kimi.com"
     
+    # 场景码按模型名子串匹配，取首个命中项（顺序敏感，短键必须排在长键之后）。
+    # K3 / K2.7 的场景码依据既有命名规律（K2.6 -> SCENARIO_K2D6、K1.5 -> SCENARIO_K1D5）推导，
+    # 建议用真实 Token 实测确认。
     SCENARIOS = {
+        "k3": "SCENARIO_K3",
+        "k2.7": "SCENARIO_K2D7",
         "k2.6": "SCENARIO_K2D6",
-        "k2.5": "SCENARIO_K2D5",
         "k2": "SCENARIO_K2",
-        "k1.5": "SCENARIO_K1D5",
-        "default": "SCENARIO_K2D6"
+        "default": "SCENARIO_K3"
     }
     
     def __init__(self, token: Optional[str] = None, base_url: Optional[str] = None):
@@ -118,14 +121,11 @@ class KimiProvider(BaseProvider):
     def models(self) -> List[str]:
         return [
             "kimi",
+            "kimi-k3",
+            "kimi-k2.7-code",
+            "kimi-k2.7-code-highspeed",
             "kimi-k2.6",
             "kimi-k2.6-code",
-            "kimi-k2.5",
-            "kimi-k2",
-            "kimi-k1.5",
-            "moonshot-v1-8k",
-            "moonshot-v1-32k",
-            "moonshot-v1-128k",
         ]
     
     async def _get_client(self) -> httpx.AsyncClient:

@@ -6,13 +6,15 @@
 
 | 平台 | 模型 | 状态 |
 |------|------|------|
-| DeepSeek | deepseek-chat, deepseek-reasoner, deepseek-v4-flash, deepseek-v4-pro, deepseek-r1 | ✅ |
-| Kimi (月之暗面) | kimi, kimi-k2.6, kimi-k2.6-code, kimi-k2.5, kimi-k2, kimi-k1.5 | ✅ |
-| Metaso (秘塔AI搜索) | metaso, metaso-fast, metaso-concise, metaso-detail, metaso-research | ✅ |
-| 豆包 (字节跳动) | doubao, doubao-pro, doubao-lite, doubao-pro-v1, doubao-lite-4k/32k, doubao-seedream-3 | ✅ |
-| 千问 (通义千问) | qwen, qwen3, qwen3.5-plus, qwen3.6-plus, qwen3-max, qwen3-flash, qwen3-coder, qwen-long | ✅ |
-| 智谱清言 (ChatGLM) | zhipu, chatglm, glm-4-plus, glm-5, glm-5-plus, glm-5.1, glm-5.1-plus | ✅ |
-| MiniMax (海螺AI) | minimax, minimax-auto, MiniMax-M2.5, MiniMax-M2.7 | ✅ |
+| DeepSeek | deepseek-flash, deepseek-reasoner, deepseek-chat, deepseek-v4-flash, deepseek-v4-pro, deepseek-r1 | ✅ |
+| Kimi (月之暗面) | kimi, kimi-k3, kimi-k2.7-code, kimi-k2.7-code-highspeed, kimi-k2.6 | ✅ |
+| Metaso (秘塔AI搜索) | metaso, metaso-fast, metaso-concise, metaso-detail, metaso-research, metaso-deep-research, metaso-scholar | ✅ |
+| 豆包 (字节跳动) | doubao, doubao-seed-2.1-pro, doubao-seed-2.1-turbo, doubao-seed-2.0-pro, doubao-pro, doubao-lite, doubao-seedream-3 | ✅ |
+| 千问 (通义千问) | qwen, qwen3, qwen3.7-max, qwen3.7-plus, qwen3.6-plus, qwen3.5-plus, qwen3-max, qwen3-flash, qwen3-coder, qwen-long | ✅ |
+| 智谱清言 (ChatGLM) | zhipu, chatglm, glm-5.3, glm-5.3-flash, glm-5.1, glm-5.1-plus, glm-5, glm-5-plus, glm-4-plus | ✅ |
+| MiniMax (海螺AI) | minimax, minimax-auto, MiniMax-M3, MiniMax-M2.7, MiniMax-M2.5 | ✅ |
+
+> 模型清单最后同步于 2026-09-10，各平台完整清单见 `src/providers/*.py` 的 `models` 属性与调用 `/v1/models`。
 
 ## 功能特性
 
@@ -186,6 +188,8 @@ yy = md5(f"{encoded_path}_{body}{md5(str(time_ms))}ooui")
 
 **支持模型**：
 - `minimax` / `minimax-auto` - Auto 模式
+- `MiniMax-M3` - MiniMax M3 旗舰模型（100 万上下文、原生多模态）
+- `MiniMax-M2.7` - MiniMax M2.7 对话模型
 - `MiniMax-M2.5` - MiniMax M2.5 对话模型
 
 **注意**：MiniMax Agent 平台与 MiniMax 开放 API 是不同的服务，模型名称也不同。
@@ -329,6 +333,24 @@ A: 部分模型（如 DeepSeek R1）会输出思维链内容，响应时间较�
 
 ### Q: 如何获取思维链内容？
 A: 思维链内容会包含在响应中，以 `<think:...>` 格式标记。
+
+## 模型更新记录
+
+### 2026-09-10
+
+各平台均同步至当期最新模型：
+
+| 平台 | 本次变更 |
+|------|----------|
+| DeepSeek | 新增 `deepseek-flash`（对应 V4.1 Flash，2026-09-10 发布，全面接替 V4 Pro）；`deepseek-v4-pro` 官方计划于 2026-09-14 12:00 下线，届时请求自动转由 V4.1 Flash 处理 |
+| Kimi | 新增 `kimi-k3`（2.8T 旗舰）、`kimi-k2.7-code`、`kimi-k2.7-code-highspeed`；移除已下线的 `kimi-k2.5`、`kimi-k2`、`kimi-k1.5` 与 `moonshot-v1` 系列（2026-08-31 起调用返回 404） |
+| Metaso | 新增 `metaso-deep-research` 别名（对应「深度研究」模式） |
+| 豆包 | 新增 `doubao-seed-2.1-pro`、`doubao-seed-2.1-turbo`（Seed 2.1 系列，2026-06-23 发布）与 `doubao-seed-2.0-pro` |
+| 千问 | 新增 `qwen3.7-max`、`qwen3.7-plus`（Qwen3.7 系列，2026-05 起发布） |
+| 智谱清言 | 新增 `glm-5.3`（旗舰，1M 上下文、思考常开）、`glm-5.3-flash`（原生多模态，2026-08-26 开源） |
+| MiniMax | 新增 `MiniMax-M3`（2026-06-01 发布，1M 上下文、原生多模态） |
+
+> **待实测项**：本项目通过 Web 逆向调用，部分平台使用内部编码而非官方模型 ID。Kimi 的 `SCENARIO_K3` / `SCENARIO_K2D7` 场景码、MiniMax M3 的 `model_type`（推导值 503）、千问与豆包的新模型内部编码，均依据既有命名规律推导，需用真实 Token 实测确认。
 
 ## License
 

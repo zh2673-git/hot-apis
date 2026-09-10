@@ -43,8 +43,9 @@ class DeepSeekProvider(BaseProvider):
     @property
     def models(self) -> List[str]:
         return [
-            "deepseek-chat",
+            "deepseek-flash",
             "deepseek-reasoner",
+            "deepseek-chat",
             "deepseek-v4-flash",
             "deepseek-v4-pro",
             "deepseek",

@@ -54,6 +54,8 @@ class QwenProvider(BaseProvider):
         return [
             "qwen",
             "qwen3",
+            "qwen3.7-max",
+            "qwen3.7-plus",
             "qwen3.5-plus",
             "qwen3.6-plus",
             "qwen3-max",
@@ -325,6 +327,8 @@ class QwenProvider(BaseProvider):
             "qwen3": "Qwen",
             "qwen3.5-plus": "Qwen3.5-Plus",
             "qwen3.6-plus": "Qwen3.6-Plus",
+            "qwen3.7-plus": "Qwen3.7-Plus",
+            "qwen3.7-max": "Qwen3.7-Max",
             "qwen3-max": "Qwen3-Max",
             "qwen3-max-thinking": "Qwen3-Max-Thinking-Preview",
             "qwen3-flash": "Qwen3-Flash",
