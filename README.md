@@ -83,6 +83,23 @@ print(resp.choices[0].message.tool_calls[0].function)
 | 智谱 | ⚠️ | provider 间歇返回空（上游问题），暂不建议用于 agent |
 | 千问 / 秘塔 | ❌ | 上游风控/限流，provider 不可用 |
 
+### 实测演示
+
+下方截图来自自研 agent 项目 **[react-agent](https://github.com/zh2673-git/react-agent)**
+（Rust 内核，性能拉满）。接入本服务后，它能有效完成工具调用与技能（skill）装载，日常使用足够。
+
+**接入配置**：provider 选「openai 兼容」，模型 `deepseek-flash`，端点指向本服务
+`http://127.0.0.1:8000/v1`——
+
+![react-agent 接入本服务的配置](docs/images/react-agent-config.png)
+
+**运行效果**：`load_skill` 装载 media-gen 技能（10ms），随后成功调用 `image_gen` 生图——
+
+![react-agent 技能装载与工具调用](docs/images/react-agent-skill.png)
+
+> 其他 agent（Cline / Roo Code / Continue 等）**未实测，效果不作保证**。
+> 本服务暴露的是标准 OpenAI `tools` 协议，理论上均可接入，欢迎自行验证并反馈。
+
 注意：Web 逆向通道**抗不住高频**（同一平台连续约 12 次后开始返回空），agent 请降低并发。
 
 ## Token 获取

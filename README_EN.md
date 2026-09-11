@@ -90,6 +90,27 @@ to continue the loop.
 | Zhipu | ⚠️ | provider intermittently returns empty (upstream issue) |
 | Qwen / Metaso | ❌ | upstream risk control / rate limit |
 
+### Live Demo
+
+The screenshots below come from my self-developed agent project,
+**[react-agent](https://github.com/zh2673-git/react-agent)** (Rust kernel, maximum
+performance). Connected to this service, it reliably performs tool calling and skill
+loading — good enough for daily use.
+
+**Connection settings**: provider "OpenAI compatible", model `deepseek-flash`, endpoint
+pointing at this service `http://127.0.0.1:8000/v1` —
+
+![react-agent connection settings](docs/images/react-agent-config.png)
+
+**In action**: `load_skill` loads the media-gen skill (10 ms), then `image_gen` is
+called successfully to generate an image —
+
+![react-agent skill loading and tool calling](docs/images/react-agent-skill.png)
+
+> Other agents (Cline / Roo Code / Continue etc.) are **untested; results are not
+> guaranteed**. This service exposes the standard OpenAI `tools` protocol, so they should
+> work in theory — verification and feedback are welcome.
+
 Note: the reverse-engineered channel **does not tolerate high frequency** (~12 consecutive
 calls per platform start returning empty). Keep agent concurrency low.
 
