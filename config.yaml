@@ -2,6 +2,15 @@ server:
   host: "0.0.0.0"
   port: 8000
 
+rate_limit:
+  # 每平台两次请求的最小间隔（毫秒）。Web 逆向通道高频调用会触发上游风控
+  # （限流返回空，甚至「账号已被禁言至 …」），默认 3 秒；0 = 关闭控频（风险自负）。
+  # 也可用环境变量 RATE_LIMIT_MS 覆盖。
+  min_interval_ms: 3000
+  # 按平台覆盖（毫秒）：
+  # overrides:
+  #   deepseek: 5000
+
 providers:
   deepseek:
     base_url: "https://chat.deepseek.com"

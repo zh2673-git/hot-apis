@@ -17,9 +17,16 @@ from .models import (
 )
 from .providers import DeepSeekProvider, KimiProvider, MetasoProvider, DoubaoProvider, QwenProvider, ZhipuProvider, MiniMaxProvider, BaseProvider
 from .tools import pipeline as tools_pipeline
+from .ratelimit import RateLimiter
 
 
 providers: Dict[str, BaseProvider] = {}
+
+# 每平台控频：同平台请求强制最小间隔（防上游风控/禁言），见 config.yaml rate_limit
+rate_limiter = RateLimiter(
+    default_interval_ms=settings.rate_limit.min_interval_ms,
+    per_provider_ms=settings.rate_limit.overrides,
+)
 
 
 def get_provider_for_model(model: str) -> tuple[str, BaseProvider]:
@@ -142,7 +149,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="NXAPI - OpenAI Compatible API",
     description="大模型 API 中转站，支持 DeepSeek、Kimi、Metaso、豆包、千问、智谱清言和 MiniMax",
-    version="1.4.0",
+    version="1.5.0",
     lifespan=lifespan
 )
 
@@ -157,7 +164,7 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    return {"message": "NXAPI - OpenAI Compatible API", "version": "1.4.0"}
+    return {"message": "NXAPI - OpenAI Compatible API", "version": "1.5.0"}
 
 
 @app.get("/v1/models", response_model=ModelList)
@@ -226,6 +233,8 @@ async def chat_completions(
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
 
+        await rate_limiter.acquire(provider_name)
+
         if request.stream:
             return StreamingResponse(
                 stream_chat_completion(provider, request),
@@ -263,6 +272,8 @@ async def chat_completions(
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+    await rate_limiter.acquire(provider_name)
 
     prepared = tools_pipeline.prepare(request)
 

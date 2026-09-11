@@ -1,6 +1,6 @@
 from pydantic_settings import BaseSettings
 from pydantic import Field
-from typing import Optional
+from typing import Optional, Dict
 import yaml
 import os
 from dotenv import load_dotenv
@@ -11,6 +11,12 @@ load_dotenv()
 class ServerConfig(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
+
+
+class RateLimitConfig(BaseSettings):
+    """每平台控频：同平台两次请求的最小间隔（毫秒），0 = 关闭（高风险）"""
+    min_interval_ms: float = 3000.0
+    overrides: Dict[str, float] = Field(default_factory=dict)
 
 
 class DeepSeekConfig(BaseSettings):
@@ -69,6 +75,7 @@ class ProviderConfig(BaseSettings):
 class Config(BaseSettings):
     server: ServerConfig = Field(default_factory=ServerConfig)
     providers: ProviderConfig = Field(default_factory=ProviderConfig)
+    rate_limit: RateLimitConfig = Field(default_factory=RateLimitConfig)
 
     @classmethod
     def load(cls, config_path: str = "config.yaml") -> "Config":
@@ -104,7 +111,17 @@ class Config(BaseSettings):
                 config_data["providers"]["zhipu"]["token"] = zhipu_token
             if minimax_token:
                 config_data["providers"]["minimax"]["token"] = minimax_token
-        
+
+        # 环境变量 RATE_LIMIT_MS 覆盖全局控频间隔（毫秒）
+        rate_limit_ms = os.getenv("RATE_LIMIT_MS")
+        if rate_limit_ms and rate_limit_ms.strip():
+            try:
+                rl = dict(config_data.get("rate_limit") or {})
+                rl["min_interval_ms"] = float(rate_limit_ms)
+                config_data["rate_limit"] = rl
+            except ValueError:
+                pass
+
         return cls(**config_data)
 
 

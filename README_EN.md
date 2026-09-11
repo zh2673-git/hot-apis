@@ -111,8 +111,19 @@ called successfully to generate an image —
 > guaranteed**. This service exposes the standard OpenAI `tools` protocol, so they should
 > work in theory — verification and feedback are welcome.
 
-Note: the reverse-engineered channel **does not tolerate high frequency** (~12 consecutive
-calls per platform start returning empty). Keep agent concurrency low.
+### Rate limiting & account safety (important)
+
+High-frequency calls on reverse-engineered channels trigger upstream risk control: at
+best responses come back empty, at worst the account gets **temporarily muted**
+(observed 2026-09-11: "account muted until 11:02 the next day"). The relay therefore
+enforces a per-platform minimum interval with automatic queueing:
+
+- Default **3000 ms** per platform; tune via `rate_limit.min_interval_ms` in `config.yaml`
+  (per-platform `overrides`) or the `RATE_LIMIT_MS` env var; set `0` to disable (at your
+  own risk)
+- **While an account is muted, stop calling that platform** until the ban lifts
+- Multi-turn agent tool loops are covered by the same limiter — no extra config needed
+- For high-throughput scenarios, use the official APIs (recommended above)
 
 ## Getting Tokens
 
